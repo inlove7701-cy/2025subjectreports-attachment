@@ -1,12 +1,12 @@
 import streamlit as st
 import google.generativeai as genai
-import io  # ← 새로 추가
+import io 
+
+# 클립보드 붙여넣기 기능 (선택사항)
 try:
-    from streamlit_image_paste import image_paste  # ← 새로 추가 (클립보드 이미지용)
+    from streamlit_image_paste import image_paste
 except ImportError:
     image_paste = None
-    
-
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
@@ -15,7 +15,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- 2. [디자인] 숲속 테마 CSS (기존 디자인 유지) ---
+# --- 2. [디자인] 숲속 테마 CSS ---
 st.markdown("""
     <style>
     /* 폰트 설정 */
@@ -188,7 +188,6 @@ st.markdown("")
 with st.expander("⚙️ AI 모델 직접 선택하기 (고급 설정)"):
     manual_model = st.selectbox(
         "사용할 모델을 선택하세요",
-        # 라벨은 예전 이름 그대로 두고, 실제로는 2.5 라인 사용
         ["🤖 자동 (Auto)", "⚡ gemini-1.5-flash (빠름/무료)", "🤖 gemini-1.5-pro (고성능)"],
         index=0
     )
@@ -199,28 +198,27 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
     if not api_key:
         st.error("⚠️ API Key가 설정되지 않았습니다.")
     elif not student_input and not uploaded_files:
-        # 텍스트도 없고 파일도 없으면 경고
         st.warning("⚠️ 학생 관찰 내용 또는 참고 자료(이미지/PDF) 중 하나 이상은 제공해주세요!")
     else:
         with st.spinner('AI가 교과 세특 전문가 모드로 분석 중입니다...'):
             try:
-                # API 키 설정
                 genai.configure(api_key=api_key)
 
-                # --- 모델 선택 로직 (이미지/PDF 있을 때는 pro 우선 권장) ---
-                # 기본값
-                target_model = "gemini-2.5-flash"
-                # 업로드 파일이 있으면 멀티모달에 강한 pro 권장
-                if uploaded_files:
-                    target_model = "gemini-2.5-pro"
+                # --- 모델 선택 로직 ---
+                # 기본값 설정
+                target_model = "gemini-1.5-flash"
+                
+                # 파일이 있으면 멀티모달에 강한 1.5-pro를 권장하지만, 사용자가 선택한 경우 존중
+                has_files = uploaded_files or pasted_image
 
                 if "pro" in manual_model:
-                    target_model = "gemini-2.5-pro"
+                    target_model = "gemini-1.5-pro"
                 elif "flash" in manual_model:
-                    target_model = "gemini-2.5-flash"
+                    target_model = "gemini-1.5-flash"
                 elif "자동" in manual_model:
-                    # 자동 모드는 업로드 여부에 따라 flash / pro 분기
-                    target_model = "gemini-2.5-pro" if uploaded_files else "gemini-2.5-flash"
+                    # 자동 모드: 파일이 있으면 1.5-pro, 없으면 1.5-flash 권장
+                    # (단, 1.5-flash도 멀티모달 가능하므로 속도를 위해 flash 우선 가능)
+                    target_model = "gemini-1.5-pro" if has_files else "gemini-1.5-flash"
 
                 # 모드별 프롬프트 설정
                 if "엄격하게" in mode:
@@ -234,12 +232,11 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                     temp = 0.75
                     prompt_instruction = """
                     # ★★★ 풍성 작성 원칙 (Rich Mode) ★★★
-                    1. **의미 부여 (Elaboration)**: 단순한 활동 나열을 넘어, 해당 탐구가 학생의 지적 호기심을 어떻게 충족시켰는지 교육적으로 서술하십시오.
-                    2. **유기적 연결**: '동기-과정-결과-후속활동'이 물 흐르듯 연결되도록 문장을 구성하십시오.
+                    1. **의미 부여 (Elaboration)**: 단순한 활동 나열을 넘어, 해당 탐구가 학생의 지적 호기심을 어떻게 충족시켰는지 교육적으로 해석하여 서술하십시오.
+                    2. **유기적 연결**: '동기-과정-결과-후속활동'이 물 흐르듯 자연스럽게 이어지도록 문장을 구성하십시오.
                     3. 학업적 성장과 잠재력을 긍정적이고 구체적인 언어로 표현하십시오.
                     """
 
-                # GenerationConfig는 dict로 넘겨도 잘 동작함 (버전 호환용)
                 model = genai.GenerativeModel(
                     model_name=target_model,
                     generation_config={"temperature": temp}
@@ -286,52 +283,54 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 """
 
                 # --- 멀티모달 콘텐츠 구성 (텍스트 + 이미지/PDF) ---
-    contents = [base_prompt]
+                contents = [base_prompt]
 
-# 1) 파일 업로더에서 온 이미지/PDF
-if uploaded_files:
-    for f in uploaded_files:
-        file_bytes = f.getvalue()
-        if f.type.startswith("image/"):
-            contents.append({
-                "mime_type": f.type,
-                "data": file_bytes,
-            })
-        elif f.type == "application/pdf":
-            contents.append({
-                "mime_type": "application/pdf",
-                "data": file_bytes,
-            })
+                # 1) 파일 업로더에서 온 이미지/PDF
+                if uploaded_files:
+                    for f in uploaded_files:
+                        file_bytes = f.getvalue()
+                        # 이미지인 경우
+                        if f.type.startswith("image/"):
+                            contents.append({
+                                "mime_type": f.type,
+                                "data": file_bytes,
+                            })
+                        # PDF인 경우
+                        elif f.type == "application/pdf":
+                            contents.append({
+                                "mime_type": "application/pdf",
+                                "data": file_bytes,
+                            })
 
-# 2) 클립보드(Ctrl+V)에서 온 이미지
-if pasted_image is not None:
-    # pasted_image 는 PIL.Image 이므로, 바이트로 변환
-    buf = io.BytesIO()
-    pasted_image.save(buf, format="PNG")
-    img_bytes = buf.getvalue()
-    contents.append({
-        "mime_type": "image/png",
-        "data": img_bytes,
-    })
-
+                # 2) 클립보드(Ctrl+V)에서 온 이미지
+                if pasted_image is not None:
+                    # pasted_image는 PIL.Image 객체이므로 바이트로 변환
+                    buf = io.BytesIO()
+                    pasted_image.save(buf, format="PNG")
+                    img_bytes = buf.getvalue()
+                    contents.append({
+                        "mime_type": "image/png",
+                        "data": img_bytes,
+                    })
 
                 # --- Gemini 호출 ---
                 if len(contents) == 1:
-                    # 첨부 파일이 없는 경우: 텍스트만
+                    # 첨부 파일이 없는 경우: 텍스트만 전달
                     response = model.generate_content(contents[0])
                 else:
                     # 텍스트 + 파일들을 함께 전달
                     response = model.generate_content(contents)
 
-                # 라이브러리 버전에 따라 .text 속성이 없을 수도 있으므로 방어적으로 처리
+                # 결과 텍스트 추출
+                full_text = ""
                 if hasattr(response, "text") and response.text:
                     full_text = response.text
                 else:
-                    # 후보 첫 번째 텍스트로 폴백
+                    # 안전장치
                     try:
                         full_text = response.candidates[0].content.parts[0].text
-                    except Exception:
-                        raise RuntimeError("AI 응답에서 텍스트를 가져오지 못했습니다.")
+                    except:
+                        full_text = "AI 응답을 생성하지 못했습니다."
 
                 # --- 결과 분리 ---
                 if "---SPLIT---" in full_text:
@@ -377,7 +376,7 @@ if pasted_image is not None:
                 if "429" in str(e):
                     st.error("🚨 오늘 사용 가능한 무료 AI 횟수를 모두 쓰셨습니다!")
                 elif "404" in str(e):
-                    st.error("🚨 모델을 찾을 수 없습니다. (requirements.txt 버전 또는 모델 이름을 확인해주세요.)")
+                    st.error("🚨 모델을 찾을 수 없습니다. (API 키 프로젝트가 1.5 모델을 지원하지 않거나 requirements.txt 버전 문제일 수 있습니다.)")
                 else:
                     st.error(f"오류가 발생했습니다: {e}")
 
@@ -388,6 +387,3 @@ st.markdown("""
     문의: <a href="mailto:inlove11@naver.com" style="color: #888; text-decoration: none;">inlove11@naver.com</a>
 </div>
 """, unsafe_allow_html=True)
-
-
-
