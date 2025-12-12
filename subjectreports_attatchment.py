@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-import io 
+import io
 
 # 클립보드 붙여넣기 기능 (선택사항)
 try:
@@ -116,12 +116,15 @@ st.markdown("### 1. 수업 활동 및 관찰 내용")
 student_input = st.text_area(
     "입력창",
     height=200,
-    placeholder="예시: '유전' 단원 학습 중 유전자 가위 기술에 흥미를 느껴 관련 논문을 찾아봄. CRISPR 기술의 원리를 분석하고, 생명윤리적 관점에서 자신의 견해를 담은 보고서를 제출함.", 
+    placeholder="예시: '유전' 단원 학습 중 유전자 가위 기술에 흥미를 느껴 관련 논문을 찾아봄. CRISPR 기술의 원리를 분석하고, 생명윤리적 관점에서 자신의 견해를 담은 보고서를 제출함.",
     label_visibility="collapsed"
 )
 
 if student_input and len(student_input) < 30:
-    st.markdown("<p class='warning-text'>⚠️ 내용이 조금 짧습니다. 어떤 활동을 어떻게 했는지 구체적으로 적어주세요.</p>", unsafe_allow_html=True)
+    st.markdown(
+        "<p class='warning-text'>⚠️ 내용이 조금 짧습니다. 어떤 활동을 어떻게 했는지 구체적으로 적어주세요.</p>",
+        unsafe_allow_html=True
+    )
 
 # 🔹 5-1. 이미지 / PDF 업로드 영역
 uploaded_files = st.file_uploader(
@@ -145,7 +148,6 @@ if image_paste is not None:
 else:
     st.info("Ctrl+V 붙여넣기를 사용하려면 requirements.txt 에 `streamlit-image-paste` 를 추가하고 재배포해주세요.")
 
-
 # --- 6. 3단계 작성 옵션 ---
 st.markdown("### 2. 작성 옵션 설정")
 
@@ -156,7 +158,7 @@ with st.container(border=True):
         "모드",
         ["✨ 풍성하게 (교육적 평가 추가)", "🛡️ 엄격하게 (팩트 중심)"],
         captions=["탐구의 의미와 학업적 성장을 구체화하여 작성합니다.", "입력된 활동 사실 위주로 건조하게 작성합니다."],
-        horizontal=True, 
+        horizontal=True,
         label_visibility="collapsed"
     )
 
@@ -169,19 +171,28 @@ with st.container(border=True):
         label_visibility="collapsed"
     )
 
-# [카드 3] [수정됨] 과목세특 전용 키워드
+# [카드 3] 과목세특 전용 키워드
 with st.container(border=True):
     st.markdown('<p class="card-title">③ 강조할 학업 역량 (다중 선택)</p>', unsafe_allow_html=True)
     filter_options = [
-        "👑 AI 자동 판단", 
-        "🔎 비판적 사고력", "📊 데이터 분석/활용", "💡 창의적 문제해결", 
-        "📚 심화 지식 탐구", "🗣️ 논리적 의사소통", "🤝 협업 및 리더십", 
+        "👑 AI 자동 판단",
+        "🔎 비판적 사고력", "📊 데이터 분석/활용", "💡 창의적 문제해결",
+        "📚 심화 지식 탐구", "🗣️ 논리적 의사소통", "🤝 협업 및 리더십",
         "🔗 진로/전공 연계", "📖 자기주도적 학습"
     ]
     try:
-        selected_tags = st.pills("키워드 버튼", options=filter_options, selection_mode="multi", label_visibility="collapsed")
+        selected_tags = st.pills(
+            "키워드 버튼",
+            options=filter_options,
+            selection_mode="multi",
+            label_visibility="collapsed"
+        )
     except Exception:
-        selected_tags = st.multiselect("키워드 선택", filter_options, label_visibility="collapsed")
+        selected_tags = st.multiselect(
+            "키워드 선택",
+            filter_options,
+            label_visibility="collapsed"
+        )
 
 # [고급 설정] 모델 선택
 st.markdown("")
@@ -202,13 +213,11 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
     else:
         with st.spinner('AI가 교과 세특 전문가 모드로 분석 중입니다...'):
             try:
+                # API 키 설정
                 genai.configure(api_key=api_key)
 
                 # --- 모델 선택 로직 ---
-                # 기본값 설정
                 target_model = "gemini-1.5-flash"
-                
-                # 파일이 있으면 멀티모달에 강한 1.5-pro를 권장하지만, 사용자가 선택한 경우 존중
                 has_files = uploaded_files or pasted_image
 
                 if "pro" in manual_model:
@@ -216,8 +225,6 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 elif "flash" in manual_model:
                     target_model = "gemini-1.5-flash"
                 elif "자동" in manual_model:
-                    # 자동 모드: 파일이 있으면 1.5-pro, 없으면 1.5-flash 권장
-                    # (단, 1.5-flash도 멀티모달 가능하므로 속도를 위해 flash 우선 가능)
                     target_model = "gemini-1.5-pro" if has_files else "gemini-1.5-flash"
 
                 # 모드별 프롬프트 설정
@@ -289,13 +296,11 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 if uploaded_files:
                     for f in uploaded_files:
                         file_bytes = f.getvalue()
-                        # 이미지인 경우
                         if f.type.startswith("image/"):
                             contents.append({
                                 "mime_type": f.type,
                                 "data": file_bytes,
                             })
-                        # PDF인 경우
                         elif f.type == "application/pdf":
                             contents.append({
                                 "mime_type": "application/pdf",
@@ -304,7 +309,6 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
 
                 # 2) 클립보드(Ctrl+V)에서 온 이미지
                 if pasted_image is not None:
-                    # pasted_image는 PIL.Image 객체이므로 바이트로 변환
                     buf = io.BytesIO()
                     pasted_image.save(buf, format="PNG")
                     img_bytes = buf.getvalue()
@@ -315,21 +319,17 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
 
                 # --- Gemini 호출 ---
                 if len(contents) == 1:
-                    # 첨부 파일이 없는 경우: 텍스트만 전달
                     response = model.generate_content(contents[0])
                 else:
-                    # 텍스트 + 파일들을 함께 전달
                     response = model.generate_content(contents)
 
                 # 결과 텍스트 추출
-                full_text = ""
                 if hasattr(response, "text") and response.text:
                     full_text = response.text
                 else:
-                    # 안전장치
                     try:
                         full_text = response.candidates[0].content.parts[0].text
-                    except:
+                    except Exception:
                         full_text = "AI 응답을 생성하지 못했습니다."
 
                 # --- 결과 분리 ---
@@ -346,8 +346,8 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
 
                 # 바이트 계산 (한글 3byte 가정)
                 byte_count = 0
-                for char in final_text:
-                    if ord(char) > 127:
+                for ch in final_text:
+                    if ord(ch) > 127:
                         byte_count += 3
                     else:
                         byte_count += 1
@@ -372,7 +372,6 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 st.text_area("결과 (복사해서 나이스에 붙여넣으세요)", value=final_text, height=350)
 
             except Exception as e:
-                # 에러 처리
                 if "429" in str(e):
                     st.error("🚨 오늘 사용 가능한 무료 AI 횟수를 모두 쓰셨습니다!")
                 elif "404" in str(e):
