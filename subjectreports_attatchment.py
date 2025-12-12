@@ -1,17 +1,14 @@
 import streamlit as st
 import google.generativeai as genai
-from pypdf import PdfReader # PDF 읽기용
-from PIL import Image       # 이미지 처리용
-import io
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
-    page_title="2025 영어 세특 메이트 (AI Vision)",
-    page_icon="📘",
+    page_title="2025 과목세특 메이트",
+    page_icon="📚",
     layout="centered"
 )
 
-# --- 2. [디자인] 숲속 테마 CSS ---
+# --- 2. [디자인] 숲속 테마 CSS (기존 디자인 유지) ---
 st.markdown("""
     <style>
     /* 폰트 설정 */
@@ -19,7 +16,7 @@ st.markdown("""
         font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif; 
     }
     
-    /* 입력창 디자인 */
+    /* 입력창: 부드러운 테두리 */
     .stTextArea textarea { 
         border-radius: 12px; 
         border: 1px solid rgba(85, 124, 100, 0.2); 
@@ -30,7 +27,7 @@ st.markdown("""
     h1 { font-weight: 700; letter-spacing: -1px; color: #2F4F3A; } 
     .subtitle { font-size: 16px; color: #666; margin-top: -15px; margin-bottom: 30px; }
     
-    /* 버튼 스타일 */
+    /* 버튼 스타일: 세이지 그린 */
     .stButton button { 
         background-color: #557C64 !important; 
         color: white !important;
@@ -48,14 +45,6 @@ st.markdown("""
         color: white !important;
     }
     
-    /* 파일 업로더 스타일 커스텀 */
-    div[data-testid="stFileUploader"] {
-        border: 1px dashed #557C64;
-        border-radius: 10px;
-        padding: 10px;
-        background-color: #F7F9F8;
-    }
-
     /* 슬라이더 스타일 */
     div[data-testid="stSlider"] div[data-baseweb="slider"] > div {
         background-color: #E0E0E0 !important; border-radius: 10px; height: 6px !important; 
@@ -92,69 +81,49 @@ st.markdown("""
 # --- 3. API 키 설정 ---
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
-except FileNotFoundError:
+except Exception:
     api_key = None
 
 # --- 4. 헤더 영역 ---
-st.title("📘 2025 영어 과목세특 메이트")
-st.markdown("<p class='subtitle'>Gift for English Teachers (Text + PDF/Image)</p>", unsafe_allow_html=True)
+st.title("📚 2025 과목세특 메이트")
+st.markdown("<p class='subtitle'>Subject Specific Records Generator</p>", unsafe_allow_html=True)
 st.divider()
 
 if not api_key:
     with st.expander("🔐 관리자 설정 (API Key 입력)"):
         api_key = st.text_input("Google API Key", type="password")
 
-# 영어 세특용 작성 팁
+# [수정됨] 과목세특용 작성 팁
 st.markdown("""
 <div class="guide-box">
-    <span class="guide-title">💡 고퀄리티 영어 세특을 위한 가이드</span>
-    입력창에 내용을 적거나, <b>학생의 수행평가 자료(PDF/이미지)</b>를 업로드하세요.<br><br>
-    1. <b>(What)</b> 수업 내용, 지문 주제, 수행평가 활동<br>
-    2. <b>(How)</b> 심화 자료(TED, 원서) 탐구 과정 및 파일 첨부<br>
-    3. <b>(Why)</b> 향상된 영어 실력 및 진로 연계
+    <span class="guide-title">💡 완벽한 세특을 위한 3-Step 작성법</span>
+    단순한 활동 나열은 NO! 아래 3가지 흐름이 들어가게 적어주세요.<br><br>
+    1. <b>(동기/수업내용)</b> 교과서 단원, 배운 개념, 혹은 호기심을 갖게 된 계기<br>
+    2. <b>(심화탐구)</b> 수행평가, 보고서 작성, 독서 등 구체적인 탐구 과정<br>
+    3. <b>(성장/결과)</b> 이를 통해 확장된 지식, 변화된 생각, 진로와의 연결점
 </div>
 """, unsafe_allow_html=True)
 
-# --- 5. 입력 영역 (텍스트 + 파일) ---
-st.markdown("### 1. 학생 관찰 내용 및 자료")
-
-# 텍스트 입력
+# --- 5. 입력 영역 ---
+st.markdown("### 1. 수업 활동 및 관찰 내용")
 student_input = st.text_area(
     "입력창",
-    height=150,
-    placeholder="예시: '환경' 단원을 배우고 첨부된 파일과 같이 에세이를 작성함. 수업 시간에 배운 표현을 활용하여...", 
+    height=200,
+    placeholder="예시: '유전' 단원 학습 중 유전자 가위 기술에 흥미를 느껴 관련 논문을 찾아봄. CRISPR 기술의 원리를 분석하고, 생명윤리적 관점에서 자신의 견해를 담은 보고서를 제출함.", 
     label_visibility="collapsed"
 )
 
-# [NEW] 파일 업로더 추가
-uploaded_file = st.file_uploader("📂 증빙 자료 업로드 (PDF, 이미지)", type=['pdf', 'png', 'jpg', 'jpeg'])
+if student_input and len(student_input) < 30:
+    st.markdown("<p class='warning-text'>⚠️ 내용이 조금 짧습니다. 어떤 활동을 어떻게 했는지 구체적으로 적어주세요.</p>", unsafe_allow_html=True)
 
-# 파일 정보 표시
-file_content = ""
-upload_image = None # 이미지 객체 저장용
-
-if uploaded_file is not None:
-    # 1. PDF 파일인 경우: 텍스트 추출
-    if uploaded_file.type == "application/pdf":
-        try:
-            reader = PdfReader(uploaded_file)
-            for page in reader.pages:
-                file_content += page.extract_text() + "\n"
-            st.info(f"📄 PDF 파일 '{uploaded_file.name}'의 내용을 읽어들였습니다.")
-        except Exception as e:
-            st.error("PDF를 읽는 중 오류가 발생했습니다.")
-    
-    # 2. 이미지 파일인 경우: 이미지 객체 저장
-    else:
-        try:
-            upload_image = Image.open(uploaded_file)
-            st.image(upload_image, caption="업로드된 이미지", width=200)
-            st.info("📷 이미지를 인식했습니다. AI가 내용을 분석합니다.")
-        except:
-            st.error("이미지를 처리할 수 없습니다.")
-
-if not student_input and not uploaded_file:
-    st.markdown("<p class='warning-text'>⚠️ 텍스트를 입력하거나 파일을 업로드해주세요.</p>", unsafe_allow_html=True)
+# 🔹 5-1. 이미지 / PDF 업로드 영역 (새로 추가)
+uploaded_files = st.file_uploader(
+    "📎 세특 작성에 참고할 이미지 또는 PDF 자료를 첨부하세요 (선택)",
+    type=["png", "jpg", "jpeg", "pdf"],
+    accept_multiple_files=True
+)
+if uploaded_files:
+    st.caption(f"첨부된 파일 수: {len(uploaded_files)}개")
 
 # --- 6. 3단계 작성 옵션 ---
 st.markdown("### 2. 작성 옵션 설정")
@@ -164,8 +133,8 @@ with st.container(border=True):
     st.markdown('<p class="card-title">① 작성 모드 선택</p>', unsafe_allow_html=True)
     mode = st.radio(
         "모드",
-        ["✨ 풍성하게 (내용 보강)", "🛡️ 엄격하게 (팩트 중심)"],
-        captions=["살을 붙여 자연스럽게 만듭니다.", "자료에 있는 내용만 서술합니다."],
+        ["✨ 풍성하게 (교육적 평가 추가)", "🛡️ 엄격하게 (팩트 중심)"],
+        captions=["탐구의 의미와 학업적 성장을 구체화하여 작성합니다.", "입력된 활동 사실 위주로 건조하게 작성합니다."],
         horizontal=True, 
         label_visibility="collapsed"
     )
@@ -173,120 +142,212 @@ with st.container(border=True):
 # [카드 2] 희망 분량
 with st.container(border=True):
     st.markdown('<p class="card-title">② 희망 분량 (공백 포함)</p>', unsafe_allow_html=True)
-    target_length = st.slider("글자 수", 100, 1000, 500, 10, label_visibility="collapsed")
+    target_length = st.slider(
+        "글자 수",
+        min_value=100, max_value=1000, value=500, step=10,
+        label_visibility="collapsed"
+    )
 
-# [카드 3] 키워드 선택
+# [카드 3] [수정됨] 과목세특 전용 키워드
 with st.container(border=True):
-    st.markdown('<p class="card-title">③ 강조할 핵심 역량 (다중 선택)</p>', unsafe_allow_html=True)
-    filter_options = ["👑 AI 자동 판단", "📖 심화 독해력", "✍️ 논리적 영작문", "🗣️ 유창한 발표", "📚 어휘/문법 활용", "🔎 비판적 사고", "🌏 글로벌 감각", "🚀 진로 연계"]
+    st.markdown('<p class="card-title">③ 강조할 학업 역량 (다중 선택)</p>', unsafe_allow_html=True)
+    filter_options = [
+        "👑 AI 자동 판단", 
+        "🔎 비판적 사고력", "📊 데이터 분석/활용", "💡 창의적 문제해결", 
+        "📚 심화 지식 탐구", "🗣️ 논리적 의사소통", "🤝 협업 및 리더십", 
+        "🔗 진로/전공 연계", "📖 자기주도적 학습"
+    ]
     try:
         selected_tags = st.pills("키워드 버튼", options=filter_options, selection_mode="multi", label_visibility="collapsed")
-    except:
+    except Exception:
         selected_tags = st.multiselect("키워드 선택", filter_options, label_visibility="collapsed")
 
 # [고급 설정] 모델 선택
 st.markdown("")
 with st.expander("⚙️ AI 모델 직접 선택하기 (고급 설정)"):
-    manual_model = st.selectbox("사용할 모델", ["⚡ gemini-1.5-flash (기본값)", "🤖 gemini-1.5-pro (고성능)"], index=0)
+    manual_model = st.selectbox(
+        "사용할 모델을 선택하세요",
+        # 라벨은 예전 이름 그대로 두고, 실제로는 2.5 라인 사용
+        ["🤖 자동 (Auto)", "⚡ gemini-1.5-flash (빠름/무료)", "🤖 gemini-1.5-pro (고성능)"],
+        index=0
+    )
 
 # --- 7. 실행 및 결과 영역 ---
 st.markdown("")
-if st.button("✨ 영어 세특 생성하기", use_container_width=True):
+if st.button("✨ 과목 세특 생성하기", use_container_width=True):
     if not api_key:
         st.error("⚠️ API Key가 설정되지 않았습니다.")
-    elif not student_input and not uploaded_file:
-        st.warning("⚠️ 입력 내용이나 파일 중 하나는 필수입니다!")
+    elif not student_input and not uploaded_files:
+        # 텍스트도 없고 파일도 없으면 경고
+        st.warning("⚠️ 학생 관찰 내용 또는 참고 자료(이미지/PDF) 중 하나 이상은 제공해주세요!")
     else:
-        with st.spinner(f'AI가 자료를 분석하여 세특을 작성 중입니다...'):
+        with st.spinner('AI가 교과 세특 전문가 모드로 분석 중입니다...'):
             try:
+                # API 키 설정
                 genai.configure(api_key=api_key)
 
-                # 모델 선택
-                target_model = "gemini-1.5-pro" if "pro" in manual_model else "gemini-1.5-flash"
+                # --- 모델 선택 로직 (이미지/PDF 있을 때는 pro 우선 권장) ---
+                # 기본값
+                target_model = "gemini-2.5-flash"
+                # 업로드 파일이 있으면 멀티모달에 강한 pro 권장
+                if uploaded_files:
+                    target_model = "gemini-2.5-pro"
 
-                # 모드별 프롬프트
+                if "pro" in manual_model:
+                    target_model = "gemini-2.5-pro"
+                elif "flash" in manual_model:
+                    target_model = "gemini-2.5-flash"
+                elif "자동" in manual_model:
+                    # 자동 모드는 업로드 여부에 따라 flash / pro 분기
+                    target_model = "gemini-2.5-pro" if uploaded_files else "gemini-2.5-flash"
+
+                # 모드별 프롬프트 설정
                 if "엄격하게" in mode:
                     temp = 0.2
-                    prompt_instruction = "입력된 텍스트와 파일 내용에 근거하지 않은 사실은 절대 쓰지 마십시오."
+                    prompt_instruction = """
+                    # ★★★ 엄격 작성 원칙 (Strict Mode) ★★★
+                    1. **사실 기반 서술**: 학생이 수행하지 않은 심화 활동이나 읽지 않은 책은 절대 창작하지 마십시오.
+                    2. **객관적 평가**: 미사여구(탁월함, 매우 우수함 등)를 남발하기보다, '어떤 근거로 결론을 도출함'과 같이 구체적 사실 위주로 서술하십시오.
+                    """
                 else:
                     temp = 0.75
-                    prompt_instruction = "입력된 내용이 다소 부족하더라도 문맥에 맞는 교육적 표현을 활용하여 풍성하게 작성하십시오."
+                    prompt_instruction = """
+                    # ★★★ 풍성 작성 원칙 (Rich Mode) ★★★
+                    1. **의미 부여 (Elaboration)**: 단순한 활동 나열을 넘어, 해당 탐구가 학생의 지적 호기심을 어떻게 충족시켰는지 교육적으로 서술하십시오.
+                    2. **유기적 연결**: '동기-과정-결과-후속활동'이 물 흐르듯 연결되도록 문장을 구성하십시오.
+                    3. 학업적 성장과 잠재력을 긍정적이고 구체적인 언어로 표현하십시오.
+                    """
 
-                generation_config = genai.types.GenerationConfig(temperature=temp)
-                model = genai.GenerativeModel(target_model, generation_config=generation_config)
+                # GenerationConfig는 dict로 넘겨도 잘 동작함 (버전 호환용)
+                model = genai.GenerativeModel(
+                    model_name=target_model,
+                    generation_config={"temperature": temp}
+                )
 
-                # 키워드
-                tags_str = f"핵심 키워드: {', '.join(selected_tags)}" if selected_tags else "별도 지정 없음. AI가 자율적으로 판단."
+                # 키워드 처리
+                if not selected_tags:
+                    tags_str = "별도 지정 없음. [교과지식습득] -> [심화탐구활동] -> [문제해결/응용] -> [학업역량성장] 순서로 작성."
+                else:
+                    tags_str = f"핵심 키워드: {', '.join(selected_tags)}"
 
-                # PDF 텍스트가 있다면 입력 정보에 합침
-                final_input_text = student_input
-                if file_content:
-                    final_input_text += f"\n\n[첨부된 PDF 파일 내용]:\n{file_content}"
+                # --- 프롬프트 구성 ---
+                base_prompt = f"""
+                당신은 입학사정관의 평가 기준을 완벽히 이해하고 있는 고등학교 교과 담당 교사입니다.
+                입력된 [수업 활동 관찰 내용]과 첨부 자료(이미지, PDF)를 바탕으로,
+                학생의 학업 역량이 돋보이는 '과목별 세부능력 및 특기사항(세특)'을 작성해야 합니다.
 
-                # 시스템 프롬프트
-                system_prompt = f"""
-                당신은 고등학교 영어 교사입니다. 학생의 활동 기록(텍스트 및 첨부파일)을 바탕으로 '과목 세부능력 및 특기사항'을 작성합니다.
+                # 입력 정보
+                1. 학생 활동 내용: {student_input if student_input else "텍스트로 제공된 활동 설명 없음 (첨부 자료를 중심으로 해석)."}
+                2. 강조할 핵심 역량: [{tags_str}]
+
+                # 작성 전략 (Writing Strategy)
+                1. **구체성(Specificity)**: "열심히 함"보다는 "**어떤 자료를 분석하여 어떤 결론을 도출함**"과 같이 구체적으로 서술하십시오.
+                2. **심화 확장(Deepening)**: 교과서 개념에서 시작하여 개인적인 호기심으로 심화 학습(독서, 논문, 실험 등)을 진행한 과정을 부각하십시오.
+                3. **학업 역량(Competency)**: 활동을 통해 드러난 비판적 사고력, 논리적 분석력, 창의적 문제해결력을 명시적으로 드러내십시오.
+                4. **목표 분량**: 공백 포함 약 {target_length}자 (오차범위 ±10%)
+
+                첨부된 이미지/PDF 자료에 등장하는 실험 장면, 보고서 내용, 필기, 그래프 등에서
+                학생의 탐구 과정과 사고 과정을 최대한 읽어내어 서술에 반영하십시오.
+                (단, 자료에 없는 활동이나 책 제목 등을 임의로 만들어내지는 마십시오.)
+
+                다음 두 가지 파트로 나누어 출력하세요. 구분선: "---SPLIT---"
+
+                [Part 1] 역량별 분석 (개조식)
+                - [수업태도 / 탐구주제 / 학업성취 / 발전가능성] 등으로 분류하여 요약
                 
-                [입력 정보]: {final_input_text}
-                [강조 역량]: {tags_str}
+                ---SPLIT---
+
+                [Part 2] 과목 세특 (서술형 종합본)
+                - 실제 생기부 입력용 줄글
+                - 문체: '~함', '~임', '~보임', '~분석함' (생기부 표준 문체)
                 
-                # 작성 지침
-                1. 다음 두 가지 파트로 나누어 출력하세요. 구분선: "---SPLIT---"
-                2. [Part 1] 역량별 분석: 활동 내용을 [수업참여/심화탐구/영어능력] 등으로 분류 요약.
-                3. [Part 2] 영어 세특 (종합): 공백 포함 약 {target_length}자 내외.
-                4. 첨부된 파일(이미지/PDF)이 있다면 그 내용을 구체적으로 인용하여 학생의 우수성을 드러내십시오.
                 {prompt_instruction}
                 """
 
-                # --- AI에게 요청 보내기 ---
-                # 이미지가 있으면 [프롬프트, 이미지] 리스트로 보냄
-                if upload_image:
-                    response = model.generate_content([system_prompt, upload_image])
+                # --- 멀티모달 콘텐츠 구성 (텍스트 + 이미지/PDF) ---
+                contents = [base_prompt]
+
+                if uploaded_files:
+                    for f in uploaded_files:
+                        file_bytes = f.getvalue()
+                        if f.type.startswith("image/"):
+                            # 이미지 파일
+                            contents.append({
+                                "mime_type": f.type,
+                                "data": file_bytes,
+                            })
+                        elif f.type == "application/pdf":
+                            # PDF 파일
+                            contents.append({
+                                "mime_type": "application/pdf",
+                                "data": file_bytes,
+                            })
+
+                # --- Gemini 호출 ---
+                if len(contents) == 1:
+                    # 첨부 파일이 없는 경우: 텍스트만
+                    response = model.generate_content(contents[0])
                 else:
-                    response = model.generate_content(system_prompt)
-                
-                full_text = response.text
-                
-                # 결과 분리
+                    # 텍스트 + 파일들을 함께 전달
+                    response = model.generate_content(contents)
+
+                # 라이브러리 버전에 따라 .text 속성이 없을 수도 있으므로 방어적으로 처리
+                if hasattr(response, "text") and response.text:
+                    full_text = response.text
+                else:
+                    # 후보 첫 번째 텍스트로 폴백
+                    try:
+                        full_text = response.candidates[0].content.parts[0].text
+                    except Exception:
+                        raise RuntimeError("AI 응답에서 텍스트를 가져오지 못했습니다.")
+
+                # --- 결과 분리 ---
                 if "---SPLIT---" in full_text:
                     parts = full_text.split("---SPLIT---")
                     analysis_text = parts[0].strip()
                     final_text = parts[1].strip()
                 else:
-                    analysis_text = "분석 내용을 생성하지 못했습니다."
+                    analysis_text = "영역별 분석을 생성하지 못했습니다."
                     final_text = full_text
 
-                # 글자 수 계산
                 char_count = len(final_text)
                 char_count_no_space = len(final_text.replace(" ", "").replace("\n", ""))
+
+                # 바이트 계산 (한글 3byte 가정)
                 byte_count = 0
                 for char in final_text:
-                    byte_count += 3 if ord(char) > 127 else 1
-                
+                    if ord(char) > 127:
+                        byte_count += 3
+                    else:
+                        byte_count += 1
+
+                # --- 화면 출력 ---
                 st.success("작성 완료!")
-                
+
                 with st.expander("🔍 역량별 분석 내용 확인하기 (클릭)", expanded=True):
                     st.markdown(analysis_text)
-                
+
                 st.markdown("---")
                 st.markdown("### 📋 최종 제출용 종합본")
 
                 st.markdown(f"""
                 <div class="count-box">
-                    목표: {target_length}자 | <b>실제: {char_count}자</b> (공백제외 {char_count_no_space}자)<br>
+                    📊 목표: {target_length}자 | <b>실제: {char_count}자</b> (공백제외 {char_count_no_space}자)<br>
                     💾 <b>예상 바이트: {byte_count} Bytes</b> (NEIS 기준)
                 </div>
                 """, unsafe_allow_html=True)
-                
-                st.caption(f"※ {mode.split()[1]} 모드 | 사용 모델: {target_model}")
+
+                st.caption(f"※ {mode.split()[1]} 모드 동작 중 ({target_model})")
                 st.text_area("결과 (복사해서 나이스에 붙여넣으세요)", value=final_text, height=350)
 
             except Exception as e:
+                # 에러 처리
                 if "429" in str(e):
-                    st.error("🚨 하루 무료 사용량을 초과했습니다. 내일 다시 시도해주세요.")
+                    st.error("🚨 오늘 사용 가능한 무료 AI 횟수를 모두 쓰셨습니다!")
+                elif "404" in str(e):
+                    st.error("🚨 모델을 찾을 수 없습니다. (requirements.txt 버전 또는 모델 이름을 확인해주세요.)")
                 else:
-                    st.error(f"오류 발생: {e}")
-                    st.info("GitHub의 requirements.txt에 'pypdf'와 'Pillow'가 추가되었는지 확인해주세요.")
+                    st.error(f"오류가 발생했습니다: {e}")
 
 # --- 8. 푸터 ---
 st.markdown("""
