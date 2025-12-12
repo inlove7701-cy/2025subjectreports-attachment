@@ -373,12 +373,15 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 st.text_area("결과 (복사해서 나이스에 붙여넣으세요)", value=final_text, height=350)
 
             except Exception as e:
-                if "429" in str(e):
-                    st.error("🚨 오늘 사용 가능한 무료 AI 횟수를 모두 쓰셨습니다!")
-                elif "404" in str(e):
-                    st.error("🚨 모델을 찾을 수 없습니다. (API 키 프로젝트가 1.5 모델을 지원하지 않거나 requirements.txt 버전 문제일 수 있습니다.)")
-                else:
-                    st.error(f"오류가 발생했습니다: {e}")
+                # 1단계: 원본 에러를 그대로 보여줘서 실제 이유 확인
+                st.error("원본 에러 메시지:")
+                st.exception(e)
+               # if "429" in str(e):
+               #     st.error("🚨 오늘 사용 가능한 무료 AI 횟수를 모두 쓰셨습니다!")
+               # elif "404" in str(e):
+               #     st.error("🚨 모델을 찾을 수 없습니다. (API 키 프로젝트가 1.5 모델을 지원하지 않거나 requirements.txt 버전 문제일 수 있습니다.)")
+               # else:
+               #     st.error(f"오류가 발생했습니다: {e}")
 
 # --- 8. 푸터 ---
 st.markdown("""
@@ -387,4 +390,5 @@ st.markdown("""
     문의: <a href="mailto:inlove11@naver.com" style="color: #888; text-decoration: none;">inlove11@naver.com</a>
 </div>
 """, unsafe_allow_html=True)
+
 
