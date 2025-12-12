@@ -1,4 +1,6 @@
-streamlit
-google-generativeai>=0.8.3
-pypdf
-Pillow
+streamlit==1.32.0
+google-generativeai==0.5.4
+Pillow==10.2.0
+streamlit-image-paste==0.0.8
+pdf2image==1.17.0
+PyMuPDF==1.24.3
