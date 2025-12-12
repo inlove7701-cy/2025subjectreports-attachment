@@ -217,15 +217,16 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 genai.configure(api_key=api_key)
 
                 # --- 모델 선택 로직 ---
-                target_model = "gemini-1.5-flash"
+                target_model = "gemini-2.0-flash"  # 기본값 최신 플래시
+
                 has_files = uploaded_files or pasted_image
 
                 if "pro" in manual_model:
-                    target_model = "gemini-1.5-pro"
+                    target_model = "gemini-2.0-pro"  # 있으면 사용
                 elif "flash" in manual_model:
-                    target_model = "gemini-1.5-flash"
+                  target_model = "gemini-2.0-flash"
                 elif "자동" in manual_model:
-                    target_model = "gemini-1.5-pro" if has_files else "gemini-1.5-flash"
+                  target_model = "gemini-2.0-flash"  # 자동 모드도 일단 2.0-flash
 
                 # 모드별 프롬프트 설정
                 if "엄격하게" in mode:
@@ -386,3 +387,4 @@ st.markdown("""
     문의: <a href="mailto:inlove11@naver.com" style="color: #888; text-decoration: none;">inlove11@naver.com</a>
 </div>
 """, unsafe_allow_html=True)
+
