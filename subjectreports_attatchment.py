@@ -286,7 +286,7 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 """
 
                 # --- 멀티모달 콘텐츠 구성 (텍스트 + 이미지/PDF) ---
-               contents = [base_prompt]
+    contents = [base_prompt]
 
 # 1) 파일 업로더에서 온 이미지/PDF
 if uploaded_files:
@@ -388,4 +388,5 @@ st.markdown("""
     문의: <a href="mailto:inlove11@naver.com" style="color: #888; text-decoration: none;">inlove11@naver.com</a>
 </div>
 """, unsafe_allow_html=True)
+
 
