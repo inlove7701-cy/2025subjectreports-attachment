@@ -150,7 +150,7 @@ if st.button("✨ 분석 및 세특 생성하기", use_container_width=True):
         with st.spinner('자료를 분석하여 세특을 작성 중입니다...'):
             try:
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel("gemini-1.5-flash") # 멀티모달 지원 모델
+                model = genai.GenerativeModel("gemini-1.5-flash-latest") # 멀티모달 지원 모델
                 
                 tags_str = f"강조점: {', '.join(selected_tags)}" if selected_tags else ""
                 
@@ -205,3 +205,4 @@ if st.button("✨ 분석 및 세특 생성하기", use_container_width=True):
                     
             except Exception as e:
                 st.error(f"오류 발생: {e}")
+
