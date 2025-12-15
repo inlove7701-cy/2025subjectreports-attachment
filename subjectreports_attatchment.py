@@ -1,18 +1,9 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
-import io
-import time
-
-# Pypdf 라이브러리 (파일 읽기용 - 없어도 앱이 죽지 않게 처리)
-try:
-    from pypdf import PdfReader
-except ImportError:
-    PdfReader = None
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
-    page_title="2025 과목세특 메이트",
+    page_title="2025 과목세특 메이트 (텍스트 전용)",
     page_icon="📚",
     layout="centered"
 )
@@ -43,7 +34,7 @@ except Exception:
 
 # --- 4. 헤더 영역 ---
 st.title("📚 2025 과목세특 메이트")
-st.markdown("##### 1학기 요약 + 2학기 심화(기고문/북리뷰/AI) 통합 생성")
+st.markdown("##### 1학기 요약 + 2학기 심화(기고문/북리뷰/AI) 통합 [텍스트 전용]")
 st.divider()
 
 if not api_key:
@@ -54,18 +45,18 @@ if not api_key:
 st.markdown("""
 <div class="guide-box">
     <b>💡 작성 가이드</b><br>
-    1. <b>1학기</b>: 기존 내용은 핵심만 요약하여 반영합니다.<br>
-    2. <b>2학기</b>: <b>신문기사 기고문, 원서 북리뷰, AI 도구 활용</b> 내용을 중심으로 작성됩니다.<br>
-    3. <b>증빙자료</b>: 활동지나 기사를 PDF/사진으로 첨부하면 내용이 구체적으로 반영됩니다.
+    1. <b>1학기</b>: 기존 내용을 입력하면 AI가 핵심만 요약합니다.<br>
+    2. <b>2학기</b>: 입력된 키워드를 바탕으로 <b>신문기사 기고문, 원서 북리뷰, AI 도구 활용</b> 내용으로 확장합니다.<br>
+    3. <b>결과</b>: 두 학기가 자연스럽게 연결된 500자 내외의 글이 완성됩니다.
 </div>
 """, unsafe_allow_html=True)
 
-# --- 5. 입력 영역 (분리됨) ---
+# --- 5. 입력 영역 (텍스트만 입력) ---
 
 # [1학기]
 st.markdown("### 1. 1학기 기존 세특 (요약용)")
 sem1_input = st.text_area(
-    "1학기 입력창", height=120,
+    "1학기 입력창", height=150,
     placeholder="이미 작성된 1학기 내용을 붙여넣으세요. (분량이 많으면 AI가 요약합니다)",
     label_visibility="collapsed"
 )
@@ -74,19 +65,9 @@ sem1_input = st.text_area(
 st.markdown("### 2. 2학기 활동 내용 (심화용)")
 sem2_input = st.text_area(
     "2학기 입력창", height=150,
-    placeholder="예: AI 의료 기술의 명암을 다룬 기사를 읽고 기고문 작성. 'Deep Medicine' 원서를 읽고 비평문 작성. 챗GPT와 토론하며 사고 확장.",
+    placeholder="예: AI 의료 기사 분석, 'Deep Medicine' 원서 독서, 챗GPT 활용 토론 등 (키워드 위주로 입력해도 됩니다)",
     label_visibility="collapsed"
 )
-
-# [파일 첨부]
-uploaded_files = st.file_uploader(
-    "📎 활동 증빙 자료 (이미지/PDF)", 
-    type=["png", "jpg", "jpeg", "pdf"], 
-    accept_multiple_files=True
-)
-
-if uploaded_files:
-    st.info(f"📂 {len(uploaded_files)}개의 파일이 첨부되었습니다.")
 
 # --- 6. 옵션 설정 ---
 st.markdown("### 3. 작성 옵션")
@@ -95,11 +76,11 @@ st.markdown("### 3. 작성 옵션")
 with st.container(border=True):
     col1, col2 = st.columns(2)
     with col1:
-        mode = st.radio("작성 모드", ["✨ 풍성하게 (의미 부여)", "🛡️ 엄격하게 (팩트 중심)"], horizontal=True)
+        mode = st.radio("작성 모드", ["✨ 풍성하게", "🛡️ 엄격하게"], horizontal=True)
     with col2:
         target_length = st.slider("목표 글자 수", 300, 1000, 500, 50)
 
-# [카드 2] 모델 선택 (사용자 요청대로 1.5 유지)
+# [카드 2] 모델 선택 (1.5 버전 유지)
 with st.expander("⚙️ AI 모델 선택 (기본값: 1.5-flash)"):
     manual_model = st.selectbox(
         "사용할 모델",
@@ -114,11 +95,11 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
     elif not sem1_input and not sem2_input:
         st.warning("⚠️ 1학기 내용 또는 2학기 내용을 입력해주세요!")
     else:
-        with st.spinner('1학기 내용을 요약하고 2학기 활동(기고문/북리뷰/AI)을 분석 중입니다...'):
+        with st.spinner('1학기 요약 및 2학기 심화 활동(기고문/북리뷰/AI) 작성 중...'):
             try:
                 genai.configure(api_key=api_key)
 
-                # [모델 설정] 사용자가 원했던 '작동하는' 1.5 모델 유지
+                # [모델 설정] 사용자 요청대로 1.5 모델 유지
                 if "pro" in manual_model:
                     target_model = "gemini-1.5-pro"
                 else:
@@ -126,27 +107,7 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
 
                 # 모드별 온도 설정
                 temp = 0.2 if "엄격하게" in mode else 0.75
-
                 model = genai.GenerativeModel(target_model, generation_config=genai.types.GenerationConfig(temperature=temp))
-
-                # [파일 처리 로직]
-                files_content = []
-                pdf_text_extracted = ""
-
-                if uploaded_files:
-                    for f in uploaded_files:
-                        bytes_data = f.getvalue()
-                        if f.type == "application/pdf":
-                            if PdfReader:
-                                try:
-                                    pdf_reader = PdfReader(io.BytesIO(bytes_data))
-                                    for page in pdf_reader.pages:
-                                        t = page.extract_text()
-                                        if t: pdf_text_extracted += t + "\n"
-                                except: pass
-                        elif f.type.startswith("image/"):
-                            image = Image.open(io.BytesIO(bytes_data))
-                            files_content.append(image)
 
                 # [핵심] 프롬프트: 2학기 활동 명령 & 사용자 문체 스타일 반영
                 prompt_text = f"""
@@ -154,12 +115,11 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
 
                 [입력 데이터]
                 1. 1학기 내용: {sem1_input}
-                2. 2학기 활동 개요: {sem2_input}
-                3. 증빙 자료(PDF): {pdf_text_extracted[:5000]}
-                4. 모드: {mode}
+                2. 2학기 활동 키워드: {sem2_input}
+                3. 모드: {mode}
 
                 [★ 필수 반영: 2학기 활동 내용]
-                다음 3가지 활동이 반드시 포함되어야 하며, 전체 글의 70% 비중을 차지해야 합니다.
+                입력된 2학기 키워드를 바탕으로 다음 3가지 활동을 구체적으로 서술하세요 (전체 분량의 70% 비중).
                 1. **신문기사 기고문 작성**: 관련 분야 기사를 읽고 심층 분석하여 자신의 견해를 논리적으로 기고문으로 작성함.
                 2. **원서 북리뷰**: 원서(책)를 읽고 핵심 내용을 비평하거나 주제를 확장하여 보고서를 작성함.
                 3. **AI 도구 활용**: 인공지능 도구(ChatGPT 등)를 활용하여 사고를 확장하고, 그 과정에서 느낀점이나 한계를 서술함.
@@ -168,26 +128,21 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 - **고급 어휘 사용**: 해당 교과목의 전문 용어와 고급 어휘를 맥락에 맞게 구사할 것.
                 - **논리적 서술**: "구체적 사례를 들어 ~의 위험성을 제시하고, ~의 필요성을 설득력 있게 전달함"과 같은 구조 사용.
                 - **문장 구조**: 단순 나열이 아닌, [동기 -> 심화탐구(분석) -> 결과 및 확장]의 흐름 유지.
-                - 종결 어미: '~함', '~임', '~보임', '~드러냄'.
+                - 종결 어미: '~함', '~임', '~보임', '~드러냄' (명사형 종결).
 
                 [작성 지침]
                 Step 1: 1학기 내용은 핵심 역량 위주로 요약하여 앞부분에 배치 (30% 이내).
-                Step 2: 위 2학기 3대 활동(기고문, 북리뷰, AI)을 구체적으로 서술하여 뒷부분에 배치 (70% 이상).
+                Step 2: 2학기 3대 활동(기고문, 북리뷰, AI)을 구체적으로 창작/서술하여 뒷부분에 배치 (70% 이상).
                 Step 3: 두 학기 내용이 하나의 스토리처럼 자연스럽게 연결되도록 작성.
 
                 [출력 양식]
-                1. 활동 분석 (1학기 요약 / 2학기 활동 포인트)
+                1. 활동 분석 (1학기 요약 포인트 / 2학기 반영 포인트)
                 ---SPLIT---
                 2. 최종 과목 세특 (제출용 줄글)
                 """
 
-                # 멀티모달 콘텐츠 구성
-                contents = [prompt_text]
-                if files_content:
-                    contents.extend(files_content)
-
-                # AI 호출
-                response = model.generate_content(contents)
+                # AI 호출 (텍스트 전용)
+                response = model.generate_content(prompt_text)
                 full_text = response.text
                 
                 # 결과 분리
@@ -223,7 +178,7 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
                 if "404" in str(e):
-                    st.error("🚨 모델 오류: requirements.txt 파일 확인 및 앱 재부팅(Reboot)이 필요합니다.")
+                    st.error("🚨 모델 오류: API 키를 확인해주세요.")
 
 # --- 8. 푸터 ---
 st.markdown("""
