@@ -112,13 +112,16 @@ if st.button("✨ 통합 세특 생성하기", use_container_width=True):
                 # [모델 설정] models/ 접두사 추가하여 안정성 확보
                 target_model = "models/gemini-1.5-flash" 
                 
+# --- [수정된 모델 선택 로직] ---
+                # 1.5 모델의 최신 별칭(alias)을 사용하여 호환성을 높입니다.
                 if "pro" in manual_model:
-                    target_model = "models/gemini-1.5-pro"
+                    target_model = "gemini-1.5-pro-latest"
                 elif "flash" in manual_model:
-                    target_model = "models/gemini-1.5-flash"
+                    target_model = "gemini-1.5-flash-latest"
                 elif "자동" in manual_model:
-                    target_model = "models/gemini-1.5-pro" if uploaded_files else "models/gemini-1.5-flash"
-
+                    target_model = "gemini-1.5-pro-latest" if uploaded_files else "gemini-1.5-flash-latest"
+                
+                # 모델 설정 (이름 그대로 사용)
                 model = genai.GenerativeModel(target_model)
 
                 # [스타일 가이드] 사용자가 제공한 이미지의 문체 분석 반영
@@ -204,3 +207,4 @@ if st.button("✨ 통합 세특 생성하기", use_container_width=True):
                 st.error(f"오류 발생: {e}")
                 if "404" in str(e):
                     st.error("🚨 모델을 찾을 수 없습니다. (gemini-1.5-flash가 활성화된 API 키인지 확인하세요.)")
+
