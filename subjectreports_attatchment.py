@@ -1,114 +1,173 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. 기본 설정 ---
-st.set_page_config(page_title="2025 과목세특 메이트", page_icon="📝")
+# --- 1. 페이지 설정 ---
+st.set_page_config(
+    page_title="2025 영어 세특 메이트 (1/2학기 통합)",
+    page_icon="🅰️",
+    layout="centered"
+)
 
-# --- 2. 스타일 CSS ---
+# --- 2. [디자인] 숲속 테마 CSS (기존 유지) ---
 st.markdown("""
     <style>
-    .stTextArea textarea { background-color: #FAFCFA; border-radius: 10px; }
-    .stButton button { background-color: #557C64 !important; color: white !important; font-weight: bold; border-radius: 10px; }
-    .guide-box { background-color: #F7F9F8; padding: 15px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px; color: #333; }
+    html, body, [class*="css"] { font-family: 'Pretendard', sans-serif; }
+    .stTextArea textarea { border-radius: 12px; border: 1px solid rgba(85, 124, 100, 0.2); background-color: #FAFCFA; }
+    h1 { font-weight: 700; color: #2F4F3A; } 
+    .subtitle { font-size: 16px; color: #666; margin-top: -15px; margin-bottom: 30px; }
+    .stButton button { background-color: #557C64 !important; color: white !important; border-radius: 10px; font-weight: bold; padding: 0.8rem 1rem; width: 100%; }
+    .stButton button:hover { background-color: #3E5F4A !important; transform: scale(1.01); }
+    .guide-box { background-color: #F7F9F8; padding: 20px; border-radius: 12px; border: 1px solid #E0E5E2; margin-bottom: 25px; font-size: 14px; color: #444; }
+    .count-box { background-color: #E3EBE6; color: #2F4F3A; padding: 12px; border-radius: 8px; font-weight: bold; text-align: right; border: 1px solid #C4D7CD; }
+    .semester-header { color: #2F4F3A; font-weight: bold; margin-bottom: 5px; border-bottom: 2px solid #557C64; display: inline-block; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. API 키 설정 ---
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
-except:
-    st.error("🚨 API 키를 찾을 수 없습니다. Streamlit [Settings] -> [Secrets]에 GOOGLE_API_KEY를 등록해주세요.")
-    st.stop() # 키 없으면 여기서 멈춤
+except Exception:
+    api_key = None
 
-# --- 4. 제목 및 가이드 ---
-st.title("📚 2025 과목세특 메이트")
-st.markdown("##### 1학기 요약 + 2학기 심화(기고문/북리뷰/AI) 통합")
+# --- 4. 헤더 영역 ---
+st.title("🇬🇧 2025 영어과목 세특 메이트")
+st.markdown("<p class='subtitle'>English Subject: 1학기 요약 & 2학기 심화 생성</p>", unsafe_allow_html=True)
 st.divider()
 
+if not api_key:
+    with st.expander("🔐 관리자 설정 (API Key 입력)"):
+        api_key = st.text_input("Google API Key", type="password")
+
+# 가이드 박스
 st.markdown("""
 <div class="guide-box">
-    <b>💡 작성 방식</b><br>
-    1. <b>1학기</b>: 입력 내용을 핵심 위주로 요약합니다.<br>
-    2. <b>2학기</b>: 입력 키워드를 바탕으로 <b>[신문기사 기고문 + 원서 북리뷰 + AI 활용]</b> 내용으로 확장합니다.<br>
-    3. <b>결과</b>: 두 학기 내용이 자연스럽게 이어지는 <b>500자 내외</b>의 글을 만듭니다.
+    <b>💡 영어 세특 작성 가이드</b><br>
+    <b>1학기 (요약):</b> 수행평가, 지문 분석 등 활동 팩트 위주로 압축합니다.<br>
+    <b>2학기 (생성):</b> 영어 원서 독해, 에세이 작성, TED 분석 등 <b>언어적 역량</b>을 구체화합니다.<br>
+    ※ 1, 2학기 합계 <b>500자(1500바이트) 미만</b>으로 자동 조절됩니다.
 </div>
 """, unsafe_allow_html=True)
 
-# --- 5. 입력창 (텍스트 전용) ---
-st.subheader("1. 1학기 내용 (요약 대상)")
-sem1_input = st.text_area("1학기 내용을 입력하세요", height=100, placeholder="기존 생기부 내용을 붙여넣으세요.", label_visibility="collapsed")
-
-st.subheader("2. 2학기 활동 키워드 (심화 대상)")
-st.caption("※ 입력한 주제를 바탕으로 기고문, 북리뷰, AI 활용 활동이 자동 생성됩니다.")
-sem2_input = st.text_area("2학기 주제를 입력하세요", height=100, placeholder="예: AI 의료 윤리, 'Deep Medicine' 독서, 챗GPT 토론 등", label_visibility="collapsed")
-
-# --- 6. 옵션 ---
+# --- 5. 입력 영역 (1학기/2학기 분리) ---
 col1, col2 = st.columns(2)
+
 with col1:
-    mode = st.radio("작성 모드", ["✨ 풍성하게", "🛡️ 엄격하게"], horizontal=True)
+    st.markdown('<p class="semester-header">📝 1학기 (내용 줄이기)</p>', unsafe_allow_html=True)
+    input_sem1 = st.text_area(
+        "1학기",
+        height=250,
+        placeholder="예: '환경 보호' 영문 기사 읽기 수행평가에서 플라스틱 문제의 심각성을 다룬 기사를 요약하고 발표함. 관계대명사를 활용하여...",
+        label_visibility="collapsed"
+    )
+
 with col2:
-    target_length = st.slider("목표 글자 수", 300, 1000, 500, 50)
+    st.markdown('<p class="semester-header">✨ 2학기 (새로 만들기)</p>', unsafe_allow_html=True)
+    input_sem2 = st.text_area(
+        "2학기",
+        height=250,
+        placeholder="예: 관심 진로인 'AI' 관련 TED 강연을 시청함. 기술 발전의 양면성에 대해 영어로 에세이를 작성하고, 학급 친구들과 토론함.", 
+        label_visibility="collapsed"
+    )
 
-# --- 7. 실행 로직 ---
-if st.button("✨ 세특 생성하기", use_container_width=True):
-    if not sem1_input or not sem2_input:
-        st.warning("⚠️ 1학기 내용과 2학기 키워드를 모두 입력해주세요.")
+# --- 6. 옵션 설정 ---
+st.markdown("### 작성 옵션 설정")
+
+# [카드] 영어 교과 전용 키워드
+with st.container(border=True):
+    st.markdown('<p class="card-title">🎯 2학기 강조 역량 (영어과 핵심 역량)</p>', unsafe_allow_html=True)
+    filter_options = [
+        "🗣️ 유창한 의사소통(Speaking)", "📖 비판적 독해(Reading)", "✍️ 논리적 영작(Writing)", 
+        "👂 직청직해(Listening)", "🌍 문화적 소양/다양성", "📚 심화 어휘 활용", 
+        "🛠️ 문법/구문 응용력", "🤝 협력적 문제해결", "🔗 진로 연계 심화탐구"
+    ]
+    try:
+        selected_tags = st.pills("키워드 버튼", options=filter_options, selection_mode="multi", label_visibility="collapsed")
+    except Exception:
+        selected_tags = st.multiselect("키워드 선택", filter_options, label_visibility="collapsed")
+
+# [고급 설정]
+with st.expander("⚙️ 고급 설정 (모델 & 글자 수)"):
+    manual_model = st.selectbox("AI 모델", ["🤖 자동 (Flash)", "⚡ 고성능 (Pro)"], index=0)
+    target_total_length = st.slider("총 글자 수 목표 (공백 포함)", 300, 1000, 480, step=10)
+
+# --- 7. 실행 및 결과 영역 ---
+st.markdown("")
+if st.button("✨ 영어 세특 생성하기", use_container_width=True):
+    if not api_key:
+        st.error("⚠️ API Key가 필요합니다.")
+    elif not input_sem1 and not input_sem2:
+        st.warning("⚠️ 최소한 하나의 학기 내용은 입력해주세요.")
     else:
-        with st.spinner("AI가 내용을 작성 중입니다..."):
+        with st.spinner('English Teacher 모드로 분석 중입니다...'):
             try:
-                # API 설정
                 genai.configure(api_key=api_key)
-                
-                # 모델 설정 (가장 안정적인 1.5 Flash 강제 고정)
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model_name = "gemini-1.5-pro" if "pro" in manual_model else "gemini-1.5-flash"
+                tags_str = f"강조 키워드: {', '.join(selected_tags)}" if selected_tags else "강조 키워드: 영어 독해 및 표현 능력"
 
-                # 프롬프트 작성
+                # [영어과 특화 프롬프트]
                 prompt = f"""
-                당신은 고등학교 교사입니다. 학생의 [1학기 기존 세특]과 [2학기 신규 활동]을 통합하여, 전체 분량 약 {target_length}자의 '과목 세특'을 작성하세요.
+                당신은 고등학교 **'영어' 교과 담당 교사**입니다. 
+                학생의 1년간의 활동을 바탕으로 생기부 세특(세부능력 및 특기사항)을 작성해야 합니다.
 
-                [입력 데이터]
-                - 1학기 내용: {sem1_input}
-                - 2학기 주제: {sem2_input}
-                - 모드: {mode}
+                # 입력 데이터
+                [1학기 기존 내용]: {input_sem1 if input_sem1 else "(내용 없음)"}
+                [2학기 관찰 내용]: {input_sem2 if input_sem2 else "(내용 없음)"}
+                [2학기 강조점]: {tags_str}
 
-                [★ 필수 작성 지침]
-                1. **1학기 (30%)**: 입력된 1학기 내용을 핵심만 요약하여 서두에 배치하세요.
-                2. **2학기 (70%)**: 입력된 2학기 주제를 바탕으로 아래 3가지 활동을 구체적으로 창작하여 서술하세요.
-                   - ① **신문기사 기고문**: 관련 기사를 읽고 자신의 견해를 논리적으로 기고함.
-                   - ② **원서 북리뷰**: 관련 원서를 읽고 내용을 비평하거나 심화 탐구함.
-                   - ③ **AI 도구 활용**: AI를 활용해 탐구를 확장하고 한계를 분석함.
-                3. **스타일**: '~함', '~임' 등의 생기부 문체 사용. 문장은 [동기-과정-결과-성장] 흐름 유지.
+                # ★★★ 핵심 미션 ★★★
+                **1학기와 2학기 결과물의 합계가 공백 포함 {target_total_length}자 내외(최대 500자 미만)**가 되도록 작성하세요.
 
-                [출력 양식]
-                1. 활동 요약 (1학기/2학기 포인트)
-                ---SPLIT---
-                2. 최종 세특 본문
+                # 영어과 작성 지침 (English Subject Guidelines)
+                1. **[1학기 - 요약]**: 입력된 내용에서 핵심 활동(주제)과 어법성/태도만 남기고 문장을 간결하게 줄이십시오.
+                2. **[2학기 - 심화 생성]**: 
+                   - 단순 활동 나열 금지. **'어떤 영어 자료(원서, 기사, TED)를 접하고 -> 어떤 어휘/구문을 활용하여 -> 자신의 생각을 어떻게 표현(에세이, 발표)했는지'** 구체적으로 서술하세요.
+                   - 학생의 진로와 연계된 주제를 영어로 탐구한 과정을 부각하세요.
+                3. **[표현 어휘]**: '영문 기사를 분석함', '논리적으로 서술함', '유창하게 발표함', '문맥을 정확히 파악함', '자신의 견해를 영어로 피력함' 등 교과 특화 용어를 사용하세요.
+
+                # 출력 형식 (Strict format)
+                ---1학기---
+                (1학기 내용)
+                ---2학기---
+                (2학기 내용)
                 """
 
-                # 생성 요청
+                model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
-                text = response.text
+                full_text = response.text
 
-                # 결과 분리
-                if "---SPLIT---" in text:
-                    parts = text.split("---SPLIT---")
-                    analysis = parts[0].strip()
-                    result = parts[1].strip()
-                else:
-                    analysis = "요약 없음"
-                    result = text
+                # 파싱 및 출력
+                try:
+                    parts = full_text.split("---2학기---")
+                    sem1_result = parts[0].replace("---1학기---", "").strip()
+                    sem2_result = parts[1].strip() if len(parts) > 1 else ""
+                except:
+                    sem1_result = full_text
+                    sem2_result = "생성 오류 발생"
 
-                # 결과 표시
+                total_len = len(sem1_result + sem2_result)
+                total_bytes = sum(3 if ord(c) > 127 else 1 for c in (sem1_result + sem2_result))
+
                 st.success("작성 완료!")
-                with st.expander("🔍 활동 요약 보기"):
-                    st.write(analysis)
-                
-                st.markdown("---")
-                st.text_area("최종 결과", value=result, height=400)
-                st.caption(f"글자 수: {len(result)}자 (공백 포함)")
+                st.markdown(f"""
+                <div class="count-box">
+                    📊 총 글자 수: <b>{total_len}자</b> (목표: {target_total_length}자) / 예상 {total_bytes} Bytes
+                </div>
+                """, unsafe_allow_html=True)
+
+                r_col1, r_col2 = st.columns(2)
+                with r_col1:
+                    st.info("📉 1학기 (Summary)")
+                    st.text_area("1학기", value=sem1_result, height=350)
+                with r_col2:
+                    st.success("📈 2학기 (Deep Learning)")
+                    st.text_area("2학기", value=sem2_result, height=350)
 
             except Exception as e:
-                # 에러 발생 시 정확한 이유 출력
-                st.error(f"오류가 발생했습니다: {str(e)}")
-                if "404" in str(e):
-                    st.warning("👉 해결책: 'requirements.txt' 파일을 확인하고 앱을 재부팅(Reboot) 해주세요.")
+                st.error(f"Error: {e}")
+
+# --- 8. 푸터 ---
+st.markdown("""
+<div class="footer">
+    © 2025 <b>Chaeyun with AI</b>. English Dept Edition.<br>
+</div>
+""", unsafe_allow_html=True)
