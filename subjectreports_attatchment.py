@@ -1,14 +1,15 @@
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
 
 # --- 1. 페이지 설정 ---
 st.set_page_config(
-    page_title="2025 과목세특 메이트 (텍스트 전용)",
+    page_title="2025 과목세특 메이트",
     page_icon="📚",
     layout="centered"
 )
 
-# --- 2. [디자인] 숲속 테마 CSS (기존 유지) ---
+# --- 2. [디자인] 숲속 테마 CSS ---
 st.markdown("""
     <style>
     html, body, [class*="css"] { font-family: 'Pretendard', sans-serif; }
@@ -51,7 +52,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# --- 5. 입력 영역 (텍스트만 입력) ---
+# --- 5. 입력 영역 ---
 
 # [1학기]
 st.markdown("### 1. 1학기 기존 세특 (요약용)")
@@ -80,7 +81,7 @@ with st.container(border=True):
     with col2:
         target_length = st.slider("목표 글자 수", 300, 1000, 500, 50)
 
-# [카드 2] 모델 선택 (1.5 버전 유지)
+# [카드 2] 모델 선택
 with st.expander("⚙️ AI 모델 선택 (기본값: 1.5-flash)"):
     manual_model = st.selectbox(
         "사용할 모델",
@@ -99,17 +100,17 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
             try:
                 genai.configure(api_key=api_key)
 
-                # [모델 설정] 사용자 요청대로 1.5 모델 유지
+                # 모델 선택 (1.5로 고정)
                 if "pro" in manual_model:
                     target_model = "gemini-1.5-pro"
                 else:
                     target_model = "gemini-1.5-flash"
 
-                # 모드별 온도 설정
+                # 온도 설정
                 temp = 0.2 if "엄격하게" in mode else 0.75
                 model = genai.GenerativeModel(target_model, generation_config=genai.types.GenerationConfig(temperature=temp))
 
-                # [핵심] 프롬프트: 2학기 활동 명령 & 사용자 문체 스타일 반영
+                # [프롬프트]
                 prompt_text = f"""
                 당신은 입학사정관이 주목하는 고등학교 교사입니다. 학생의 [1학기 기존 세특]과 [2학기 신규 활동]을 통합하여, 전체 분량 약 {target_length}자의 '과목 세특'을 작성하세요.
 
@@ -141,7 +142,7 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 2. 최종 과목 세특 (제출용 줄글)
                 """
 
-                # AI 호출 (텍스트 전용)
+                # AI 호출
                 response = model.generate_content(prompt_text)
                 full_text = response.text
                 
@@ -157,7 +158,11 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 # 글자 수/바이트 계산
                 char_count = len(final_text)
                 char_count_no_space = len(final_text.replace(" ", "").replace("\n", ""))
-                byte_count = len(final_text.encode('utf-8'))
+                
+                # 바이트 계산 (NEIS 기준)
+                byte_count = 0
+                for char in final_text:
+                    byte_count += 3 if ord(char) > 127 else 1
                 
                 st.success("작성 완료!")
                 
@@ -168,7 +173,7 @@ if st.button("✨ 과목 세특 생성하기", use_container_width=True):
                 st.markdown(f"""
                 <div class="count-box">
                     📊 목표: {target_length}자 | <b>실제: {char_count}자</b> (공백제외 {char_count_no_space}자)<br>
-                    💾 <b>용량: {byte_count} Bytes</b> (UTF-8 기준)
+                    💾 <b>용량: {byte_count} Bytes</b> (NEIS 기준)
                 </div>
                 """, unsafe_allow_html=True)
                 
